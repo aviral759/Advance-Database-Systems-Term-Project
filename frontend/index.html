@@ -1,0 +1,356 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="application-name" content="HybridSearch">
+  <title>Hybrid Photo Library</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='2' y='2' width='28' height='28' rx='8' fill='%235267D9'/%3E%3Ccircle cx='16' cy='16' r='7' fill='none' stroke='white' stroke-width='2.5'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+  <link rel="stylesheet" href="/styles.css">
+  <script>try{var s=JSON.parse(localStorage.getItem("hps.settings")||"{}");if(s.theme)document.documentElement.dataset.theme=s.theme;}catch(e){}</script>
+</head>
+<body>
+<div class="app">
+
+  <!-- ================================ SIDEBAR ================================ -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="logo"><span data-icon="aperture"></span></div>
+      <div>
+        <div class="brand-name">Hybrid Photo Library</div>
+        <div class="brand-sub">Semantic + structured search</div>
+      </div>
+    </div>
+
+    <nav class="nav">
+      <div class="nav-group">Library</div>
+      <button class="nav-item" data-route="search"><span data-icon="sparkles"></span>Search</button>
+      <button class="nav-item" data-route="library:all"><span data-icon="images"></span>All photos</button>
+      <button class="nav-item" data-route="library:favorites"><span data-icon="star"></span>Favorites<span class="nav-count" id="fav-count"></span></button>
+      <button class="nav-item" data-route="library:recent"><span data-icon="clock"></span>Recent</button>
+      <button class="nav-item" data-route="library:places"><span data-icon="pin"></span>Places</button>
+
+      <div class="nav-group">Collections</div>
+      <div id="nav-collections"><div class="nav-empty">Loading…</div></div>
+
+      <div class="nav-group">System</div>
+      <button class="nav-item" data-route="ingest"><span data-icon="upload"></span>Ingest</button>
+      <button class="nav-item" data-route="plan"><span data-icon="flow"></span>Execution plan<span class="nav-pill hidden" id="nav-plan-pill"></span></button>
+      <button class="nav-item" data-route="system"><span data-icon="gauge"></span>System overview</button>
+      <button class="nav-item" data-route="settings"><span data-icon="settings"></span>Settings</button>
+    </nav>
+
+    <div class="storage-card">
+      <div class="storage-head"><span>Storage</span><span class="mono" id="storage-total">—</span></div>
+      <div class="storage-bar" id="storage-bar"></div>
+      <div class="storage-legend" id="storage-legend"></div>
+      <div class="storage-foot" id="storage-foot"></div>
+    </div>
+  </aside>
+
+  <!-- ================================ MAIN ================================ -->
+  <div class="main">
+    <header class="topbar">
+      <div class="topbar-title">
+        <div class="crumbs" id="crumbs">Library</div>
+        <h1 id="page-title">Search</h1>
+      </div>
+      <form class="quick-search hidden" id="quick-search" autocomplete="off">
+        <span data-icon="search"></span><input id="quick-q" placeholder="Quick search…" spellcheck="false">
+      </form>
+      <div class="topbar-actions">
+        <span class="health" id="health"><span class="dot"></span><span id="health-text">Connecting</span></span>
+        <button class="btn" data-route="ingest"><span data-icon="upload"></span>Upload</button>
+        <button class="icon-btn" id="theme-toggle" title="Toggle light / dark" aria-label="Toggle theme"></button>
+        <button class="icon-btn" data-route="settings" title="Settings" aria-label="Settings"><span data-icon="settings"></span></button>
+      </div>
+    </header>
+
+    <div class="content">
+
+      <!-- ------------------------------ SEARCH ------------------------------ -->
+      <section class="view" id="view-search">
+        <div class="card hero">
+          <div class="hero-head">
+            <div>
+              <h2>Find any photo by describing it</h2>
+              <p class="muted">Descriptions are matched by meaning. Filters such as <code>tag:dog</code> or <code>after:2013</code> are executed by the database.</p>
+            </div>
+            <div class="seg" id="search-kind">
+              <button type="button" class="seg-btn active" id="kind-text"><span data-icon="sparkles"></span>Semantic search</button>
+              <label class="seg-btn" id="kind-image"><span data-icon="image"></span>Image search<input type="file" id="img-query" accept="image/*" hidden></label>
+            </div>
+          </div>
+
+          <form id="search-form" class="searchbox" autocomplete="off">
+            <span data-icon="search" class="sb-icon"></span>
+            <input id="q" spellcheck="false" placeholder="Describe the photos you're looking for…">
+            <button type="button" class="icon-btn ghost" id="clear-q" title="Clear" aria-label="Clear"><span data-icon="x"></span></button>
+            <button type="button" class="btn ghost" id="toggle-filters"><span data-icon="sliders"></span>Filters<span class="count hidden" id="filter-count"></span></button>
+            <button type="submit" class="btn primary" id="search-btn">Search</button>
+          </form>
+
+          <div class="examples" id="examples"></div>
+
+          <div id="filter-panel" class="filter-panel hidden">
+            <div class="filter-grid">
+              <label class="field"><span>Tags</span><input id="f-tags" list="tag-options" placeholder="dog, frisbee"><small>All must match</small></label>
+              <label class="field"><span>Objects</span><input id="f-objects" placeholder="person, dog"><small>Annotated bounding boxes</small></label>
+              <label class="field"><span>Taken from</span><input id="f-from" type="date"></label>
+              <label class="field"><span>Taken until</span><input id="f-to" type="date"></label>
+              <label class="field"><span>Camera</span><input id="f-camera" placeholder="canon"></label>
+              <label class="field"><span>Keyword</span><input id="f-text" placeholder="kitchen"><small>Exact word match (FTS5)</small></label>
+              <label class="field"><span>Source</span><select id="f-source"><option value="">Any source</option></select></label>
+              <div class="field"><span>Near (lat, lon, km)</span>
+                <div class="triple">
+                  <input id="f-lat" type="number" step="any" placeholder="lat">
+                  <input id="f-lon" type="number" step="any" placeholder="lon">
+                  <input id="f-km" type="number" step="any" min="0" placeholder="km">
+                </div>
+              </div>
+            </div>
+            <div class="region-row">
+              <div class="field"><span>Object region</span>
+                <div id="region-pad" class="region-pad" title="Drag to draw the area objects must lie inside"><div id="region-rect" class="region-rect hidden"></div></div>
+              </div>
+              <div class="region-side">
+                <p class="muted small">Drag on the frame to draw a region. Objects must lie fully inside it; this is answered by the R*Tree index.</p>
+                <div class="region-presets" id="region-presets"></div>
+                <div id="region-values" class="small"></div>
+              </div>
+            </div>
+            <div class="filter-actions">
+              <button type="button" class="btn ghost" id="filters-reset">Reset</button>
+              <button type="button" class="btn primary" id="filters-apply">Apply filters</button>
+            </div>
+            <datalist id="tag-options"></datalist>
+          </div>
+
+          <div id="active-filters" class="active-filters"></div>
+        </div>
+
+        <div id="parsed" class="card parsed hidden"></div>
+        <div id="banner" class="banner hidden"></div>
+
+        <div class="toolbar">
+          <div class="toolbar-left">
+            <span class="result-count" id="result-count"></span>
+            <span id="filters-indicator"></span>
+            <span id="strategy-indicator"></span>
+          </div>
+          <div class="toolbar-right">
+            <label class="tb-field">Sort
+              <select id="sort"><option value="relevance">Relevance</option><option value="newest">Newest first</option><option value="oldest">Oldest first</option></select>
+            </label>
+            <label class="tb-field">Min. similarity
+              <input type="range" id="min-sim" min="0" max="0.4" step="0.01" value="0"><span class="mono" id="min-sim-val">0.00</span>
+            </label>
+            <div class="seg small density-seg" role="group" aria-label="Grid density">
+              <button type="button" class="seg-btn" data-density="comfortable" title="Large thumbnails"><span data-icon="grid"></span></button>
+              <button type="button" class="seg-btn" data-density="compact" title="Small thumbnails"><span data-icon="gridsm"></span></button>
+            </div>
+          </div>
+        </div>
+        <div id="warnings"></div>
+        <div id="grid" class="grid"></div>
+        <div id="empty" class="hidden"></div>
+      </section>
+
+      <!-- ------------------------------ LIBRARY ------------------------------ -->
+      <section class="view" id="view-library">
+        <div class="lib-head">
+          <div><h2 id="lib-title">All photos</h2><p class="muted" id="lib-sub"></p></div>
+          <div class="toolbar-right">
+            <label class="tb-field" id="lib-sort-wrap">Sort
+              <select id="lib-sort"><option value="taken">Date taken</option><option value="ingested">Recently added</option><option value="name">File name</option></select>
+            </label>
+            <div class="seg small density-seg" role="group" aria-label="Grid density">
+              <button type="button" class="seg-btn" data-density="comfortable" title="Large thumbnails"><span data-icon="grid"></span></button>
+              <button type="button" class="seg-btn" data-density="compact" title="Small thumbnails"><span data-icon="gridsm"></span></button>
+            </div>
+          </div>
+        </div>
+        <div id="places" class="places hidden"></div>
+        <div id="lib-grid" class="grid"></div>
+        <div class="load-more"><button class="btn hidden" id="lib-more">Load more</button></div>
+      </section>
+
+      <!-- ------------------------------ INGEST ------------------------------ -->
+      <section class="view" id="view-ingest">
+        <div id="ro-notice" class="alert warn hidden"><span data-icon="alert"></span><div><b>Read-only demo mode.</b> Uploads and deletions are disabled on this server.</div></div>
+        <div class="card">
+          <div id="dropzone" class="dropzone">
+            <span data-icon="upload" class="dz-icon"></span>
+            <div class="dz-title">Drop photos here to add them to your library</div>
+            <div class="muted">or <label class="link">browse files<input id="file-input" type="file" accept="image/*" multiple hidden></label> · JPEG, PNG or WebP · up to 25 MB each</div>
+          </div>
+          <div class="queue-head hidden" id="queue-head"><span id="queue-count"></span><button type="button" class="link" id="queue-clear">Clear queue</button></div>
+          <div id="queue" class="queue"></div>
+        </div>
+
+        <div class="two-col">
+          <div class="card">
+            <div class="card-head"><h3>Ingestion configuration</h3></div>
+            <div class="config-list">
+              <label class="config-row">
+                <div><div class="cfg-title">Automatic tagging</div><div class="cfg-sub">CLIP zero-shot over 104 concepts</div></div>
+                <span class="switch"><input type="checkbox" id="up-autotag" checked><span class="track"></span></span>
+              </label>
+              <div class="config-row locked">
+                <div><div class="cfg-title">Extract EXIF and GPS</div><div class="cfg-sub">Always on</div></div>
+                <span class="switch"><input type="checkbox" checked disabled><span class="track"></span></span>
+              </div>
+              <div class="config-row locked">
+                <div><div class="cfg-title">Generate thumbnails</div><div class="cfg-sub">Always on · 384 px JPEG</div></div>
+                <span class="switch"><input type="checkbox" checked disabled><span class="track"></span></span>
+              </div>
+              <div class="config-row locked">
+                <div><div class="cfg-title">Duplicate detection</div><div class="cfg-sub">Always on · SHA-256 of file contents</div></div>
+                <span class="switch"><input type="checkbox" checked disabled><span class="track"></span></span>
+              </div>
+              <div class="config-row">
+                <div><div class="cfg-title">Embedding model</div><div class="cfg-sub">Configured on the server</div></div>
+                <span class="mono small" id="cfg-model">—</span>
+              </div>
+            </div>
+            <div class="form-grid">
+              <label class="field"><span>Caption for this batch</span><input id="up-caption" placeholder="Optional"></label>
+              <label class="field"><span>Tags for this batch</span><input id="up-tags" placeholder="holiday, family"></label>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-head"><h3>Pipeline</h3></div>
+            <ol class="pipeline">
+              <li class="pipe-step"><span class="pipe-num">1</span><div><b>Upload</b><span>multipart, batched</span></div></li>
+              <li class="pipe-step"><span class="pipe-num">2</span><div><b>EXIF</b><span>date, camera, GPS</span></div></li>
+              <li class="pipe-step"><span class="pipe-num">3</span><div><b>Deduplication</b><span>SHA-256</span></div></li>
+              <li class="pipe-step"><span class="pipe-num">4</span><div><b>Embedding</b><span>OpenCLIP, 512-d</span></div></li>
+              <li class="pipe-step"><span class="pipe-num">5</span><div><b>Tagging</b><span>zero-shot</span></div></li>
+              <li class="pipe-step"><span class="pipe-num">6</span><div><b>SQLite + FAISS</b><span>FTS5, R*Tree, HNSW</span></div></li>
+            </ol>
+            <button class="btn primary block" id="upload-btn" disabled>Upload</button>
+            <div class="progress hidden" id="up-progress"><div class="progress-bar" id="up-bar"></div></div>
+            <div class="muted small" id="up-label"></div>
+            <div class="tallies">
+              <div class="t-ok"><b id="t-ok">0</b><span>Completed</span></div>
+              <div class="t-dup"><b id="t-dup">0</b><span>Duplicates</span></div>
+              <div class="t-err"><b id="t-err">0</b><span>Errors</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><h3>Ingestion activity</h3><span class="muted small">This session</span></div>
+          <div class="table-wrap">
+            <table class="table">
+              <thead><tr><th>File</th><th>Status</th><th>Details</th><th>Photo</th></tr></thead>
+              <tbody id="upload-log"><tr class="empty-row"><td colspan="4">No uploads in this session yet.</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ------------------------------ PLAN / SYSTEM ------------------------------ -->
+      <section class="view" id="view-plan"><div id="plan-root"></div></section>
+      <section class="view" id="view-system"><div id="system-root"></div></section>
+
+      <!-- ------------------------------ SETTINGS ------------------------------ -->
+      <section class="view" id="view-settings">
+        <div class="two-col">
+          <div class="card">
+            <div class="card-head"><h3>Appearance</h3></div>
+            <div class="setting-row">
+              <div><div class="cfg-title">Theme</div><div class="cfg-sub">Light suits browsing and screenshots; dark suits technical demos.</div></div>
+              <div class="seg" id="set-theme">
+                <button type="button" class="seg-btn" data-value="light"><span data-icon="sun"></span>Light</button>
+                <button type="button" class="seg-btn" data-value="dark"><span data-icon="moon"></span>Dark</button>
+              </div>
+            </div>
+            <div class="setting-row">
+              <div><div class="cfg-title">Grid density</div><div class="cfg-sub">Thumbnail size in search results and the library.</div></div>
+              <div class="seg density-seg">
+                <button type="button" class="seg-btn" data-density="comfortable"><span data-icon="grid"></span>Comfortable</button>
+                <button type="button" class="seg-btn" data-density="compact"><span data-icon="gridsm"></span>Compact</button>
+              </div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-head"><h3>Search defaults</h3></div>
+            <div class="setting-row">
+              <div><div class="cfg-title">Results per query</div><div class="cfg-sub">Top-k returned by the engine.</div></div>
+              <select id="set-k"><option>12</option><option>24</option><option>48</option><option>96</option></select>
+            </div>
+            <div class="setting-row">
+              <div><div class="cfg-title">Lexical weight</div><div class="cfg-sub">How much exact keyword matches (BM25) boost the score.</div></div>
+              <input id="set-lexw" type="number" min="0" max="1" step="0.01">
+            </div>
+            <div class="setting-row">
+              <div><div class="cfg-title">Execution strategy</div><div class="cfg-sub">Auto lets the cost-based planner decide.</div></div>
+              <select id="set-mode"><option value="auto">Auto (cost-based)</option><option value="filter_first">Always filter-first</option><option value="vector_first">Always vector-first</option></select>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-head"><h3>Server</h3></div>
+            <div id="set-server"></div>
+          </div>
+          <div class="card">
+            <div class="card-head"><h3>Data stored in this browser</h3></div>
+            <div class="setting-row">
+              <div><div class="cfg-title">Favorites</div><div class="cfg-sub" id="set-fav-sub"></div></div>
+              <button type="button" class="btn" id="set-clear-fav">Clear</button>
+            </div>
+            <div class="setting-row">
+              <div><div class="cfg-title">Execution plan history</div><div class="cfg-sub" id="set-hist-sub"></div></div>
+              <button type="button" class="btn" id="set-clear-hist">Clear</button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+
+<!-- ================================ INSPECTOR DRAWER ================================ -->
+<div id="drawer" class="drawer hidden" role="dialog" aria-modal="true" aria-labelledby="d-title">
+  <div class="drawer-panel">
+    <header class="drawer-head">
+      <div class="d-title-wrap">
+        <div id="d-title" class="d-title"></div>
+        <div id="d-sub" class="d-sub"></div>
+      </div>
+      <div class="d-actions">
+        <button class="icon-btn" id="d-fav" title="Favorite" aria-label="Favorite"><span data-icon="star"></span></button>
+        <button class="btn" id="d-similar"><span data-icon="layers"></span>Find similar</button>
+        <a class="icon-btn" id="d-open" target="_blank" rel="noopener" title="Open original" aria-label="Open original"><span data-icon="external"></span></a>
+        <button class="icon-btn" id="d-copy" title="Copy photo ID" aria-label="Copy photo ID"><span data-icon="copy"></span></button>
+        <button class="icon-btn danger" id="d-delete" title="Delete photo" aria-label="Delete photo"><span data-icon="trash"></span></button>
+        <button class="icon-btn" id="d-close" title="Close (Esc)" aria-label="Close"><span data-icon="x"></span></button>
+      </div>
+    </header>
+    <div class="drawer-body">
+      <div class="stage-col">
+        <div class="stage-tools">
+          <div class="seg small">
+            <button type="button" class="seg-btn" id="zoom-out" title="Zoom out"><span data-icon="zoomOut"></span></button>
+            <button type="button" class="seg-btn" id="zoom-fit" title="Fit"><span data-icon="fit"></span><span class="mono" id="zoom-val">100%</span></button>
+            <button type="button" class="seg-btn" id="zoom-in" title="Zoom in"><span data-icon="zoomIn"></span></button>
+          </div>
+          <label class="tb-field"><span class="switch"><input type="checkbox" id="toggle-boxes" checked><span class="track"></span></span>Bounding boxes</label>
+          <span class="mono dim small" id="d-dims"></span>
+        </div>
+        <div class="stage" id="d-stage"><div class="imgwrap"><img id="d-img" alt=""><div id="bbox-layer" class="bbox-layer"></div></div></div>
+        <div class="obj-chips" id="d-objects"></div>
+      </div>
+      <div class="insp" id="d-info"></div>
+    </div>
+  </div>
+</div>
+
+<div id="toasts" class="toasts" aria-live="polite"></div>
+<script src="/app.js"></script>
+</body>
+</html>
